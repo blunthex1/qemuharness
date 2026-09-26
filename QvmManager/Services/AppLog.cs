@@ -55,6 +55,22 @@ public static class AppLog
         File.WriteAllLines(LogFile, keep);
     }
 
+    /// <summary>Wipes the log file. Used by the "Clear log" button in Diagnostics.</summary>
+    public static void Clear()
+    {
+        try
+        {
+            lock (Lock)
+            {
+                if (File.Exists(LogFile)) File.WriteAllText(LogFile, string.Empty);
+            }
+        }
+        catch
+        {
+            // Logging must never be why the app crashes.
+        }
+    }
+
     public static string ReadTail(int maxLines = 400)
     {
         try

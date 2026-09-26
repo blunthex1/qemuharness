@@ -128,4 +128,15 @@ public partial class DiagnosticsWindow : Window
         Directory.CreateDirectory(dir);
         Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
     }
+
+    private void ClearLog_Click(object sender, RoutedEventArgs e)
+    {
+        var result = MessageBox.Show(this, "Clear the log file? This can't be undone.", "Diagnostics",
+            MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (result != MessageBoxResult.Yes) return;
+
+        AppLog.Clear();
+        AppLog.Info("Log cleared from Diagnostics.");
+        Refresh();
+    }
 }

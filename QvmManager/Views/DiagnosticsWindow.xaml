@@ -23,7 +23,8 @@
             <Button Content="Copy full report" Width="140" Margin="0,0,8,0" Click="CopyReport_Click"/>
             <Button Content="Refresh" Width="100" Margin="0,0,8,0" Click="Refresh_Click"/>
             <Button Content="Open log file" Width="120" Margin="0,0,8,0" Click="OpenLog_Click"/>
-            <Button Content="Open log folder" Width="130" Click="OpenLogFolder_Click"/>
+            <Button Content="Open log folder" Width="130" Margin="0,0,8,0" Click="OpenLogFolder_Click"/>
+            <Button Content="Clear log" Width="100" Click="ClearLog_Click"/>
         </StackPanel>
 
         <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0">
