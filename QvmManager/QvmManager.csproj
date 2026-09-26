@@ -14,6 +14,7 @@
          DllNotFoundException. This setting makes the exe extract them to a temp folder at
          first run instead, so the single-file exe actually works for a WPF app. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <ApplicationIcon>Assets\qvm.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>

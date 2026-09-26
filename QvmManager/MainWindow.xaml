@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="QVM Manager" Height="620" Width="920"
+        Icon="Assets/qvm.ico"
         Background="{StaticResource BgDark}"
         WindowStartupLocation="CenterScreen">
     <Grid>
@@ -116,15 +117,17 @@
                              LostFocus="Settings_Changed"/>
                 </Grid>
 
-                <Grid Margin="0,0,0,10">
+                <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="140"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Disk size (GB)" VerticalAlignment="Center"/>
+                    <TextBlock Text="Disk" VerticalAlignment="Center"/>
                     <TextBlock Grid.Column="1" x:Name="DiskSizeText" VerticalAlignment="Center"
-                               Foreground="{StaticResource TextSecondary}"/>
+                               Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
                 </Grid>
+                <Button x:Name="ImportDiskButton" Content="Import existing disk image..." HorizontalAlignment="Left"
+                        Width="220" Margin="0,0,0,10" Click="ImportDisk_Click"/>
 
                 <CheckBox x:Name="AccelCheck" Content="Use hardware acceleration (Windows Hypervisor Platform) when available"
                           Margin="0,4,0,10" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
@@ -183,7 +186,7 @@
                         <ColumnDefinition Width="140"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Resolution (-g)" VerticalAlignment="Center"/>
+                    <TextBlock Text="Boot resolution (-g)" VerticalAlignment="Center"/>
                     <ComboBox x:Name="ResolutionBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
                               SelectionChanged="Settings_Changed">
                         <ComboBoxItem Content="Default" Tag=""/>
@@ -196,8 +199,11 @@
                         <ComboBoxItem Content="1024x768 (4:3)" Tag="1024x768"/>
                     </ComboBox>
                 </Grid>
-                <TextBlock Text="Only applies with Display set to std or vmware." FontSize="11"
-                           Foreground="{StaticResource TextSecondary}" Margin="0,-4,0,10"/>
+                <TextBlock FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,-4,0,10">
+                    Only applies with Display set to std or vmware, and only affects the boot splash/bootloader screen -
+                    once the guest OS loads its own display driver it picks its own resolution, same as any real PC's
+                    BIOS resolution getting overridden once Windows/Linux boots.
+                </TextBlock>
 
                 <Grid Margin="0,0,0,18">
                     <Grid.ColumnDefinitions>
