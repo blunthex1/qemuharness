@@ -163,9 +163,37 @@ public class QemuEngine
         }
     }
 
-    /// <summary>Whether Windows Hypervisor Platform is enabled on this machine.</summary>
+    [System.Runtime.InteropServices.DllImport("WinHvPlatform.dll")]
+    private static extern int WHvGetCapability(int capabilityCode, out int capabilityBuffer,
+        uint capabilityBufferSizeInBytes, out uint writtenSizeInBytes);
+
+    /// <summary>
+    /// Whether Windows Hypervisor Platform is usable right now. Asks the hypervisor API directly
+    /// (WHvGetCapability / HypervisorPresent), which works without admin rights. The old check,
+    /// Get-WindowsOptionalFeature, needs an elevated shell - run normally it errored, which was
+    /// read as "not available" and silently dropped every VM to slow TCG even with WHPX on.
+    /// </summary>
     public bool IsWhpxAvailable()
     {
+        try
+        {
+            // WHvCapabilityCodeHypervisorPresent = 0. WinHvPlatform.dll only exists when the
+            // feature is installed, so a missing DLL also means "not available".
+            var hr = WHvGetCapability(0, out var present, sizeof(int), out _);
+            var ok = hr == 0 && present != 0;
+            AppLog.Info($"WHPX check: WHvGetCapability hr=0x{hr:X8}, hypervisorPresent={present} -> {(ok ? "available" : "not available")}");
+            return ok;
+        }
+        catch (DllNotFoundException)
+        {
+            AppLog.Info("WHPX check: WinHvPlatform.dll not found -> Windows Hypervisor Platform isn't installed.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("WHPX check via WHvGetCapability failed, falling back to the feature query: " + ex.Message);
+        }
+
         try
         {
             var psi = new ProcessStartInfo
