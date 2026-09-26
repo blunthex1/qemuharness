@@ -232,9 +232,7 @@ public partial class MainWindow : Window
             if (manual)
             {
                 StatusLine.Text = "QEMU is up to date.";
-                MessageBox.Show(this, $"QEMU is up to date (installed build: {installed:yyyy-MM-dd}).
-
-" +
+                MessageBox.Show(this, $"QEMU is up to date (installed build: {installed:yyyy-MM-dd}).\n\n" +
                     "If you expected an update, check your internet connection - see Diagnostics for details.",
                     "QEMU update", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -253,16 +251,9 @@ public partial class MainWindow : Window
         }
 
         var answer = MessageBox.Show(this,
-            $"A newer QEMU is available.
-
-Installed: {installed:yyyy-MM-dd}
-Latest:    {latest.BuildDate:yyyy-MM-dd}
-
-" +
+            $"A newer QEMU is available.\n\nInstalled: {installed:yyyy-MM-dd}\nLatest:    {latest.BuildDate:yyyy-MM-dd}\n\n" +
             "Update now? It installs over the current QEMU (a Windows admin prompt will appear). " +
-            "Your VMs and disks aren't touched.
-
-No = skip this version.",
+            "Your VMs and disks aren't touched.\n\nNo = skip this version.",
             "QEMU update", MessageBoxButton.YesNo, MessageBoxImage.Question);
 
         if (answer != MessageBoxResult.Yes)
