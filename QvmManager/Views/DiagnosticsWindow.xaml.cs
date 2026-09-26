@@ -19,7 +19,23 @@ public partial class DiagnosticsWindow : Window
         InitializeComponent();
         _library = library;
         _engine = engine;
+
+        // The read-only TextBoxes sit inside an outer ScrollViewer; forward the mouse wheel to it
+        // (a TextBox otherwise swallows wheel events even with its own scrolling disabled).
+        HookWheel(SystemText, SystemTextScroll);
+        HookWheel(VmsText, VmsTextScroll);
+        HookWheel(LogText, LogTextScroll);
+
         Refresh();
+    }
+
+    private static void HookWheel(System.Windows.Controls.TextBox box, System.Windows.Controls.ScrollViewer scroll)
+    {
+        box.PreviewMouseWheel += (_, e) =>
+        {
+            scroll.ScrollToVerticalOffset(scroll.VerticalOffset - e.Delta / 3.0);
+            e.Handled = true;
+        };
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => Refresh();
@@ -29,7 +45,7 @@ public partial class DiagnosticsWindow : Window
         SystemText.Text = BuildSystemReport();
         VmsText.Text = BuildVmsReport();
         LogText.Text = AppLog.ReadTail();
-        LogText.ScrollToEnd();
+        LogTextScroll.ScrollToEnd();
         CopiedLabel.Visibility = Visibility.Collapsed;
     }
 

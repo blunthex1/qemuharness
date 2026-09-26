@@ -231,18 +231,8 @@ public class QemuEngine
 
         args.Add("-machine"); args.Add(string.IsNullOrWhiteSpace(vm.MachineType) ? "q35" : vm.MachineType);
 
-        if (whpx)
-        {
-            args.Add("-accel"); args.Add("whpx,kernel-irqchip=off");
-            // WHPX needs to closely mirror the real host CPU - a named/masked model
-            // (e.g. Haswell,-hle,-rtm) can hang under WHPX. "host" is the safe choice.
-            args.Add("-cpu"); args.Add("host");
-        }
-        else
-        {
-            args.Add("-accel"); args.Add("tcg");
-            args.Add("-cpu"); args.Add("max");
-        }
+        args.Add("-accel"); args.Add(whpx ? "whpx,kernel-irqchip=off" : "tcg");
+        args.Add("-cpu"); args.Add(BuildCpuArg(vm, whpx));
 
         args.Add("-m"); args.Add(vm.RamMb.ToString());
         args.Add("-smp"); args.Add(vm.Cpus.ToString());
@@ -318,6 +308,38 @@ public class QemuEngine
 
         _running[vm.Id] = proc;
         vm.LastStartedAt = DateTime.Now;
+    }
+
+    /// <summary>
+    /// Builds the -cpu value: model (blank = auto: "host" under WHPX, "max" under TCG) plus any
+    /// user flags, so "Haswell" + "-svm -hle,-rtm" becomes "Haswell,-svm,-hle,-rtm".
+    /// </summary>
+    public static string BuildCpuArg(VirtualMachine vm, bool whpx)
+    {
+        var model = string.IsNullOrWhiteSpace(vm.CpuModel) ? (whpx ? "host" : "max") : vm.CpuModel.Trim();
+
+        var flags = (vm.CpuFlags ?? "")
+            .Split(new[] { ',', ' ', '\t', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(f => f.Trim())
+            .Where(f => f.Length > 0)
+            .ToList();
+
+        if (whpx && !string.IsNullOrWhiteSpace(vm.CpuModel) && !vm.CpuModel.Trim().Equals("host", StringComparison.OrdinalIgnoreCase))
+            AppLog.Warn($"\"{vm.Name}\": using CPU model \"{model}\" under WHPX - named/masked models can hang under WHPX; clear the CPU model if it won't boot.");
+
+        return flags.Count == 0 ? model : model + "," + string.Join(",", flags);
+    }
+
+    /// <summary>How many VMs this app launched are still running.</summary>
+    public int RunningCount => _running.Values.Count(p => { try { return !p.HasExited; } catch { return false; } });
+
+    /// <summary>Force-stops every VM this app launched (used when the app closes).</summary>
+    public void KillAll()
+    {
+        foreach (var p in _running.Values.ToList())
+        {
+            try { if (!p.HasExited) p.Kill(entireProcessTree: true); } catch { /* best effort */ }
+        }
     }
 
     private static string QuoteIfNeeded(string arg) =>

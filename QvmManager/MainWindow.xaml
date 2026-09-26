@@ -1,12 +1,11 @@
 <Window x:Class="QvmManager.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="QVM Manager" Height="620" Width="920"
+        Title="QVM Manager" Height="900" Width="1600"
         MinHeight="500" MinWidth="760"
         Icon="Assets/qvm.ico"
         Background="{StaticResource BgDark}"
-        WindowStartupLocation="CenterScreen"
-        WindowState="Maximized">
+        WindowStartupLocation="CenterScreen">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="260"/>
@@ -118,6 +117,52 @@
                     <TextBox x:Name="CpuBox" Grid.Column="1" Width="140" HorizontalAlignment="Left"
                              LostFocus="Settings_Changed"/>
                 </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CPU preset" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="CpuPresetBox" Grid.Column="1" Width="360" HorizontalAlignment="Left"
+                              SelectionChanged="CpuPreset_Changed">
+                        <ComboBoxItem Content="(pick a preset to fill the fields below)" Tag=""/>
+                        <ComboBoxItem Content="Automatic (host with WHPX, max without)" Tag="|"/>
+                        <ComboBoxItem Content="host (pass through real CPU)" Tag="host|"/>
+                        <ComboBoxItem Content="max (all features QEMU can emulate)" Tag="max|"/>
+                        <ComboBoxItem Content="Haswell, Intel compat (-svm,-hle,-rtm,-arat,-tsc-deadline)" Tag="Haswell|-svm,-hle,-rtm,-arat,-tsc-deadline"/>
+                        <ComboBoxItem Content="Skylake-Client, TSX off (-hle,-rtm)" Tag="Skylake-Client|-hle,-rtm"/>
+                        <ComboBoxItem Content="Penryn, macOS-style (+invtsc,vendor=GenuineIntel)" Tag="Penryn|vendor=GenuineIntel,+invtsc"/>
+                        <ComboBoxItem Content="qemu64 (most compatible, slowest)" Tag="qemu64|"/>
+                    </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CPU model (-cpu)" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <TextBox x:Name="CpuModelBox" Width="200" LostFocus="Settings_Changed"/>
+                        <TextBlock Text="blank = automatic" VerticalAlignment="Center" Margin="10,0,0,0"
+                                   FontSize="11" Foreground="{StaticResource TextSecondary}"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CPU flags" VerticalAlignment="Center"/>
+                    <TextBox x:Name="CpuFlagsBox" Grid.Column="1" LostFocus="Settings_Changed"/>
+                </Grid>
+                <TextBlock Margin="140,0,0,4" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextSecondary}"
+                           Text="Several at once, separated by commas or spaces, e.g.  -svm,-hle,-rtm,-arat,-tsc-deadline  or  +invtsc"/>
+                <TextBlock x:Name="CpuPreviewText" Margin="140,0,0,12" FontSize="11" TextWrapping="Wrap"
+                           FontFamily="Consolas" Foreground="{StaticResource AccentBrush}"/>
 
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>

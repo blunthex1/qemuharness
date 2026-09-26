@@ -25,6 +25,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // Default is 1600x900; shrink to fit on smaller screens so it never opens off-screen.
+        var work = SystemParameters.WorkArea;
+        Width = Math.Min(Width, work.Width * 0.95);
+        Height = Math.Min(Height, work.Height * 0.95);
+
         var appRoot = _settingsStore.Settings.AppRoot;
         if (string.IsNullOrWhiteSpace(appRoot))
         {
@@ -47,6 +52,37 @@ public partial class MainWindow : Window
 
         RefreshList();
         Loaded += async (_, _) => await EnsureQemuInstalledAsync();
+    }
+
+    /// <summary>
+    /// Clicking X really exits: offers to stop any VMs still running, then shuts the whole
+    /// process down so no invisible QvmManager.exe is left behind holding files locked.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        var running = _engine?.RunningCount ?? 0;
+        if (running > 0)
+        {
+            var answer = MessageBox.Show(this,
+                $"{running} VM(s) are still running.\n\n" +
+                "Yes = stop them and exit\nNo = exit and leave them running\nCancel = don't exit",
+                "QVM Manager", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+
+            if (answer == MessageBoxResult.Cancel) { e.Cancel = true; return; }
+            if (answer == MessageBoxResult.Yes)
+            {
+                AppLog.Info($"Exiting: force-stopping {running} running VM(s).");
+                _engine!.KillAll();
+            }
+        }
+        base.OnClosing(e);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        AppLog.Info("=== QVM Manager closed ===");
+        Application.Current.Shutdown();
     }
 
     /// <summary>
@@ -236,6 +272,10 @@ public partial class MainWindow : Window
             VmSubtitle.Text = $"{_selected.OsType}  ·  {(running ? "Running" : "Stopped")}";
             RamBox.Text = _selected.RamMb.ToString();
             CpuBox.Text = _selected.Cpus.ToString();
+            CpuModelBox.Text = _selected.CpuModel ?? "";
+            CpuFlagsBox.Text = _selected.CpuFlags ?? "";
+            CpuPresetBox.SelectedIndex = 0;
+            UpdateCpuPreview();
             DiskSizeText.Text = _selected.ImportedDisk
                 ? $"Imported: {_selected.DiskPath} ({_selected.DiskFormat})"
                 : $"{_selected.DiskSizeGb} GB {_selected.DiskFormat} (created by QVM Manager)";
@@ -267,6 +307,9 @@ public partial class MainWindow : Window
 
         if (int.TryParse(RamBox.Text, out var ram) && ram > 0) _selected.RamMb = ram;
         if (int.TryParse(CpuBox.Text, out var cpus) && cpus > 0) _selected.Cpus = cpus;
+        _selected.CpuModel = CpuModelBox.Text.Trim();
+        _selected.CpuFlags = CpuFlagsBox.Text.Trim();
+        UpdateCpuPreview();
         _selected.EnableAcceleration = AccelCheck.IsChecked == true;
         _selected.EnableAudio = AudioCheck.IsChecked == true;
         _selected.AttachTabletDevice = TabletCheck.IsChecked == true;
@@ -280,6 +323,31 @@ public partial class MainWindow : Window
         _selected.ExtraArgs = ExtraArgsBox.Text;
 
         _library.Save();
+    }
+
+    /// <summary>Fills the CPU model + flags boxes from the chosen preset ("model|flags" in the Tag).</summary>
+    private void CpuPreset_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSettingsEvents || _selected == null) return;
+        var tag = TagOf(CpuPresetBox);
+        if (string.IsNullOrEmpty(tag)) return; // the "(pick a preset...)" placeholder
+
+        var parts = tag.Split('|');
+        CpuModelBox.Text = parts[0];
+        CpuFlagsBox.Text = parts.Length > 1 ? parts[1] : "";
+        Settings_Changed(sender, e);
+    }
+
+    /// <summary>Shows the exact -cpu value that will be passed to QEMU.</summary>
+    private void UpdateCpuPreview()
+    {
+        if (_selected == null) { CpuPreviewText.Text = ""; return; }
+        var probe = new VirtualMachine { Name = _selected.Name, CpuModel = CpuModelBox.Text, CpuFlags = CpuFlagsBox.Text };
+        var withWhpx = QemuEngine.BuildCpuArg(probe, whpx: true);
+        var withoutWhpx = QemuEngine.BuildCpuArg(probe, whpx: false);
+        CpuPreviewText.Text = withWhpx == withoutWhpx
+            ? $"Will pass:  -cpu {withWhpx}"
+            : $"Will pass:  -cpu {withWhpx}  (with WHPX)   /   -cpu {withoutWhpx}  (without)";
     }
 
     /// <summary>Selects the ComboBoxItem whose Tag matches, falling back to the first item.</summary>

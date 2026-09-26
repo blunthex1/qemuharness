@@ -7,6 +7,13 @@ namespace QvmManager;
 
 public partial class App : Application
 {
+    protected override void OnExit(ExitEventArgs e)
+    {
+        base.OnExit(e);
+        // Belt and braces: make sure nothing (e.g. a stray background thread) keeps the process alive.
+        Environment.Exit(e.ApplicationExitCode);
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -23,6 +30,15 @@ public partial class App : Application
                 $"Details were written to the log ({AppLog.LogFile}). Use the Diagnostics window to copy a full report.",
                 "QVM Manager - error", MessageBoxButton.OK, MessageBoxImage.Error);
             args.Handled = true;
+
+            // If the error happened while the main window was still being built, there's no
+            // window to close - without this the process would linger invisibly (and keep
+            // QvmManager.exe/.dll locked so the next build can't overwrite them).
+            if (Current.MainWindow == null || !Current.MainWindow.IsLoaded)
+            {
+                AppLog.Error("Error happened before the main window finished loading - exiting.");
+                Current.Shutdown(1);
+            }
         };
 
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>

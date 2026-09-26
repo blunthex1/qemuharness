@@ -36,6 +36,14 @@ public class VirtualMachine
     public bool EnableAudio { get; set; } = true;
     public bool EnableAcceleration { get; set; } = true; // use WHPX if available
 
+    /// <summary>QEMU -cpu model. Blank = automatic ("host" under WHPX, "max" under TCG).</summary>
+    public string CpuModel { get; set; } = "";
+    /// <summary>
+    /// Extra CPU feature flags appended to the model, e.g. "-svm,-hle,-rtm,-arat,-tsc-deadline".
+    /// Commas or spaces both work as separators, so several can be applied at once.
+    /// </summary>
+    public string CpuFlags { get; set; } = "";
+
     // Chipset / devices - these map straight to QEMU's own -machine, -drive if=,
     // -vga and -nic model= options, so the values below are QEMU's own option names.
     public string MachineType { get; set; } = "q35";        // q35 | pc
