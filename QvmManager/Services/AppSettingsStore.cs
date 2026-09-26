@@ -11,6 +11,9 @@ public class AppSettings
     /// "<AppRoot>\qemu\". Null until the user has picked (or accepted the default) once.
     /// </summary>
     public string? AppRoot { get; set; }
+
+    /// <summary>QEMU installer build the user chose "not now" for, so we don't ask again for that same build.</summary>
+    public string? SkippedQemuBuild { get; set; }
 }
 
 /// <summary>

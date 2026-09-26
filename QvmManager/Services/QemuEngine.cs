@@ -45,27 +45,97 @@ public class QemuEngine
 
     public bool IsQemuInstalled => File.Exists(QemuExe) && File.Exists(QemuImgExe);
 
-    /// <summary>Downloads and silently installs the official Stefan Weil QEMU Windows build.</summary>
-    public async Task InstallQemuAsync(IProgress<string>? progress = null)
+    private const string QemuDownloadBase = "https://qemu.weilnetz.de/w64/";
+
+    /// <summary>A QEMU Windows installer on the download site, e.g. qemu-w64-setup-20250826.exe.</summary>
+    public record QemuBuild(string SetupName, DateTime BuildDate)
     {
+        public override string ToString() => $"{BuildDate:yyyy-MM-dd} ({SetupName})";
+    }
+
+    /// <summary>Written next to QEMU after we install it, recording exactly which build it was.</summary>
+    private string InstalledMarkerFile => Path.Combine(QemuInstallDir, "qvm-installed-build.txt");
+
+    /// <summary>Lists the download site and returns the newest installer (their names end in the build date).</summary>
+    public async Task<QemuBuild> GetLatestBuildAsync()
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+        var html = await http.GetStringAsync(QemuDownloadBase);
+
+        var builds = Regex.Matches(html, @"qemu-w64-setup-(\d{8})\.exe")
+            .Select(m => (name: m.Value, date: m.Groups[1].Value))
+            .Distinct()
+            .Select(x => DateTime.TryParseExact(x.date, "yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var d) ? new QemuBuild(x.name, d) : null)
+            .Where(b => b != null)
+            .Select(b => b!)
+            .OrderBy(b => b.BuildDate)
+            .ToList();
+
+        if (builds.Count == 0)
+            throw new Exception($"Couldn't find a QEMU installer at {QemuDownloadBase}");
+        return builds.Last();
+    }
+
+    /// <summary>
+    /// Build date of the installed QEMU: from our marker file if we installed it, otherwise the
+    /// qemu-system-x86_64.exe file date (older installs from before the marker existed).
+    /// </summary>
+    public DateTime? InstalledBuildDate()
+    {
+        if (!IsQemuInstalled) return null;
+        try
+        {
+            if (File.Exists(InstalledMarkerFile))
+            {
+                var m = Regex.Match(File.ReadAllText(InstalledMarkerFile), @"(\d{8})");
+                if (m.Success && DateTime.TryParseExact(m.Groups[1].Value, "yyyyMMdd",
+                        System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var d))
+                    return d;
+            }
+            return File.GetLastWriteTime(QemuExe).Date;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Returns the newer build if one is available, otherwise null. Never throws.</summary>
+    public async Task<QemuBuild?> CheckForUpdateAsync()
+    {
+        try
+        {
+            var installed = InstalledBuildDate();
+            if (installed == null) return null;
+            var latest = await GetLatestBuildAsync();
+            // 1-day slack: the exe's file date can be a day off the installer's build date.
+            var newer = latest.BuildDate > installed.Value.AddDays(1);
+            AppLog.Info($"QEMU update check: installed {installed:yyyy-MM-dd}, latest {latest} -> {(newer ? "update available" : "up to date")}");
+            return newer ? latest : null;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("QEMU update check failed (offline?): " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Downloads and silently installs the official Stefan Weil QEMU Windows build - the latest one,
+    /// or <paramref name="build"/> if given. Installing over an existing QEMU updates it in place.
+    /// </summary>
+    public async Task InstallQemuAsync(IProgress<string>? progress = null, QemuBuild? build = null)
+    {
+        if (RunningCount > 0)
+            throw new Exception("Stop all running VMs before installing or updating QEMU.");
+
         AppLog.Info("Starting QEMU install into " + QemuInstallDir);
         Directory.CreateDirectory(QemuInstallDir);
 
         progress?.Report("Finding the latest QEMU build...");
-        const string baseUrl = "https://qemu.weilnetz.de/w64/";
+        build ??= await GetLatestBuildAsync();
+        var baseUrl = QemuDownloadBase;
         using var http = new HttpClient();
-        var html = await http.GetStringAsync(baseUrl);
 
-        var matches = Regex.Matches(html, @"qemu-w64-setup-\d+\.exe")
-            .Select(m => m.Value)
-            .Distinct()
-            .OrderBy(s => s)
-            .ToList();
-
-        if (matches.Count == 0)
-            throw new Exception($"Couldn't find a QEMU installer at {baseUrl}");
-
-        var setupName = matches.Last();
+        var setupName = build.SetupName;
         var setupPath = Path.Combine(QemuInstallDir, setupName);
 
         progress?.Report($"Downloading {setupName}...");
@@ -108,7 +178,8 @@ public class QemuEngine
             throw new Exception("QEMU installer finished but qemu-system-x86_64.exe was not found. Try installing manually.");
         }
 
-        AppLog.Info("QEMU install finished successfully: " + QemuVersion());
+        try { File.WriteAllText(InstalledMarkerFile, setupName); } catch { /* best effort */ }
+        AppLog.Info("QEMU install finished successfully: " + QemuVersion() + " from " + setupName);
     }
 
     /// <summary>Runs "qemu-system-x86_64 --version" for the diagnostics panel. Returns a short error string instead of throwing.</summary>

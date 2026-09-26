@@ -21,6 +21,7 @@
                                Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
                     <Button Content="+ New VM" Margin="0,0,0,8" Click="NewVm_Click"/>
                     <Button x:Name="StorageLocationButton" Content="Storage location..." Margin="0,0,0,8" Click="StorageLocation_Click"/>
+                    <Button Content="Check for QEMU update" Margin="0,0,0,8" Click="CheckQemuUpdate_Click"/>
                     <Button x:Name="DiagnosticsButton" Content="Diagnostics..." Click="Diagnostics_Click"/>
                 </StackPanel>
 

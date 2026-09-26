@@ -51,7 +51,11 @@ public partial class MainWindow : Window
         _engine.VmStopped += vm => Dispatcher.Invoke(() => RefreshList(vm.Id));
 
         RefreshList();
-        Loaded += async (_, _) => await EnsureQemuInstalledAsync();
+        Loaded += async (_, _) =>
+        {
+            await EnsureQemuInstalledAsync();
+            await CheckQemuUpdateAsync(manual: false);
+        };
     }
 
     /// <summary>
@@ -205,6 +209,84 @@ public partial class MainWindow : Window
                 "You can install it yourself from https://qemu.weilnetz.de/w64/ into:\n" + _engine.QemuInstallDir +
                 "\n\nSee Diagnostics for the full error and log.",
                 "Install failed", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void CheckQemuUpdate_Click(object sender, RoutedEventArgs e) => _ = CheckQemuUpdateAsync(manual: true);
+
+    /// <summary>
+    /// Compares the installed QEMU against the newest build on the download site and offers to update.
+    /// On startup (manual=false) it stays quiet when up to date or offline, and doesn't re-ask about a
+    /// build the user already said "not now" to.
+    /// </summary>
+    private async Task CheckQemuUpdateAsync(bool manual)
+    {
+        if (!_engine.IsQemuInstalled) return;
+
+        if (manual) StatusLine.Text = "Checking for a newer QEMU...";
+        var latest = await _engine.CheckForUpdateAsync();
+        var installed = _engine.InstalledBuildDate();
+
+        if (latest == null)
+        {
+            if (manual)
+            {
+                StatusLine.Text = "QEMU is up to date.";
+                MessageBox.Show(this, $"QEMU is up to date (installed build: {installed:yyyy-MM-dd}).
+
+" +
+                    "If you expected an update, check your internet connection - see Diagnostics for details.",
+                    "QEMU update", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            return;
+        }
+
+        if (!manual && _settingsStore.Settings.SkippedQemuBuild == latest.SetupName) return;
+
+        if (_engine.RunningCount > 0)
+        {
+            StatusLine.Text = $"A QEMU update is available ({latest.BuildDate:yyyy-MM-dd}). Stop your VMs, then use \"Check for QEMU update\".";
+            if (manual)
+                MessageBox.Show(this, "A QEMU update is available, but VMs are running. Stop them first, then check again.",
+                    "QEMU update", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var answer = MessageBox.Show(this,
+            $"A newer QEMU is available.
+
+Installed: {installed:yyyy-MM-dd}
+Latest:    {latest.BuildDate:yyyy-MM-dd}
+
+" +
+            "Update now? It installs over the current QEMU (a Windows admin prompt will appear). " +
+            "Your VMs and disks aren't touched.
+
+No = skip this version.",
+            "QEMU update", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (answer != MessageBoxResult.Yes)
+        {
+            _settingsStore.Settings.SkippedQemuBuild = latest.SetupName;
+            _settingsStore.Save();
+            AppLog.Info($"User skipped QEMU update {latest}.");
+            StatusLine.Text = "QEMU update skipped. Use \"Check for QEMU update\" to get it later.";
+            return;
+        }
+
+        try
+        {
+            var progress = new Progress<string>(msg => StatusLine.Text = msg);
+            await _engine.InstallQemuAsync(progress, latest);
+            _settingsStore.Settings.SkippedQemuBuild = null;
+            _settingsStore.Save();
+            StatusLine.Text = "QEMU updated: " + _engine.QemuVersion();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Error("QEMU update failed", ex);
+            MessageBox.Show(this, $"Couldn't update QEMU:\n{ex.Message}\n\nYour current QEMU is still installed. See Diagnostics for details.",
+                "Update failed", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
