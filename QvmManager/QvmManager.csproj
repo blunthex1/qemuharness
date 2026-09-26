@@ -17,4 +17,14 @@
     <ApplicationIcon>Assets\qvm.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- The .exe icon (ApplicationIcon above) is baked in at compile time, but the
+       Window.Icon="Assets/qvm.ico" references in the XAML files (for the taskbar/
+       title-bar icon while running) load it as a pack-URI resource at runtime -
+       SDK-style WPF projects don't auto-include a raw .ico as a resource, so without
+       this it throws "Provide value on ImageSourceConverter threw an exception" the
+       moment a window with Icon=... tries to load. -->
+  <ItemGroup>
+    <Resource Include="Assets\qvm.ico" />
+  </ItemGroup>
+
 </Project>
