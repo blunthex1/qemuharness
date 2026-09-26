@@ -136,7 +136,7 @@ public class QemuEngine
         }
     }
 
-    public void CreateDisk(string diskPath, string sizeGb)
+    public void CreateDisk(string diskPath, string sizeGb, string format = "qcow2")
     {
         if (File.Exists(diskPath)) return;
 
@@ -149,7 +149,7 @@ public class QemuEngine
         };
         psi.ArgumentList.Add("create");
         psi.ArgumentList.Add("-f");
-        psi.ArgumentList.Add("qcow2");
+        psi.ArgumentList.Add(format);
         psi.ArgumentList.Add(diskPath);
         psi.ArgumentList.Add(sizeGb + "G");
 
@@ -206,8 +206,13 @@ public class QemuEngine
 
         if (!File.Exists(vm.DiskPath))
         {
-            AppLog.Info($"No disk yet for \"{vm.Name}\", creating {vm.DiskSizeGb}G at {vm.DiskPath}");
-            CreateDisk(vm.DiskPath, vm.DiskSizeGb);
+            if (vm.ImportedDisk)
+            {
+                AppLog.Error($"\"{vm.Name}\" points at an imported disk that no longer exists: {vm.DiskPath}");
+                throw new Exception($"The imported disk file is missing:\n{vm.DiskPath}\n\nIt may have been moved or deleted outside QVM Manager.");
+            }
+            AppLog.Info($"No disk yet for \"{vm.Name}\", creating {vm.DiskSizeGb}G {vm.DiskFormat} at {vm.DiskPath}");
+            CreateDisk(vm.DiskPath, vm.DiskSizeGb, vm.DiskFormat);
         }
 
         var whpx = vm.EnableAcceleration && IsWhpxAvailable();
@@ -318,29 +323,34 @@ public class QemuEngine
     private static string QuoteIfNeeded(string arg) =>
         arg.Contains(' ') ? $"\"{arg}\"" : arg;
 
-    /// <summary>Builds the right -drive/-device combination for the chosen disk interface.</summary>
+    /// <summary>Builds the right -drive/-device combination for the chosen disk interface and format.</summary>
     private static void AddDiskArgs(System.Collections.Generic.IList<string> args, VirtualMachine vm)
     {
+        var format = string.IsNullOrWhiteSpace(vm.DiskFormat) ? "qcow2" : vm.DiskFormat;
+
         switch (vm.DiskInterface)
         {
             case "ide":
-                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=ide,format=qcow2");
+                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=ide,format={format}");
                 break;
 
             case "sata":
-                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=none,id=sata_disk0,format=qcow2");
+                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=none,id=sata_disk0,format={format}");
                 args.Add("-device"); args.Add("ahci,id=ahci0");
                 args.Add("-device"); args.Add("ide-hd,drive=sata_disk0,bus=ahci0.0");
                 break;
 
             case "nvme":
-                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=none,id=nvme_disk0,format=qcow2");
+                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=none,id=nvme_disk0,format={format}");
                 args.Add("-device"); args.Add("nvme,drive=nvme_disk0,serial=qvm0001");
                 break;
 
             case "virtio":
             default:
-                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=virtio,format=qcow2,discard=unmap,detect-zeroes=unmap");
+                // discard/detect-zeroes=unmap need qcow2's own sparse-file support; an imported
+                // raw/vdi/vmdk disk doesn't get those flags.
+                var extra = format == "qcow2" ? ",discard=unmap,detect-zeroes=unmap" : "";
+                args.Add("-drive"); args.Add($"file={vm.DiskPath},if=virtio,format={format}{extra}");
                 break;
         }
     }

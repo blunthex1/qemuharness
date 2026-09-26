@@ -236,7 +236,9 @@ public partial class MainWindow : Window
             VmSubtitle.Text = $"{_selected.OsType}  ·  {(running ? "Running" : "Stopped")}";
             RamBox.Text = _selected.RamMb.ToString();
             CpuBox.Text = _selected.Cpus.ToString();
-            DiskSizeText.Text = _selected.DiskSizeGb + " GB (fixed at creation)";
+            DiskSizeText.Text = _selected.ImportedDisk
+                ? $"Imported: {_selected.DiskPath} ({_selected.DiskFormat})"
+                : $"{_selected.DiskSizeGb} GB {_selected.DiskFormat} (created by QVM Manager)";
             AccelCheck.IsChecked = _selected.EnableAcceleration;
             AudioCheck.IsChecked = _selected.EnableAudio;
             TabletCheck.IsChecked = _selected.AttachTabletDevice;
@@ -315,6 +317,58 @@ public partial class MainWindow : Window
             _library.Save();
         }
     }
+
+    private void ImportDisk_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selected == null) return;
+
+        if (_engine.IsRunning(_selected))
+        {
+            MessageBox.Show(this, "Stop the VM before changing its disk.", "QVM Manager",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var hadExistingDisk = File.Exists(_selected.DiskPath);
+        var result = MessageBox.Show(this,
+            "Point this VM at a disk image you already have (e.g. from another QEMU setup, or " +
+            "exported from VirtualBox/VMware)?\n\n" +
+            (hadExistingDisk
+                ? "This VM already has a disk - it will be replaced (the old one isn't deleted from disk, just unlinked)."
+                : "This VM doesn't have a disk yet, so nothing is lost either way."),
+            "Import existing disk", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+        if (result != MessageBoxResult.OK) return;
+
+        var dlg = new OpenFileDialog
+        {
+            Title = "Choose an existing disk image",
+            Filter = "Disk images (*.qcow2;*.img;*.raw;*.vdi;*.vmdk;*.vhd;*.vhdx)|*.qcow2;*.img;*.raw;*.vdi;*.vmdk;*.vhd;*.vhdx|All files (*.*)|*.*"
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        _selected.DiskPath = dlg.FileName;
+        _selected.DiskFormat = GuessDiskFormat(dlg.FileName);
+        _selected.ImportedDisk = true;
+        _library.Save();
+
+        AppLog.Info($"\"{_selected.Name}\" now points at imported disk {dlg.FileName} (format: {_selected.DiskFormat})");
+        LoadSelectedIntoPanel();
+        StatusLine.Text = $"Now using the imported disk. Format guessed as \"{_selected.DiskFormat}\" - " +
+                           "change it back in Diagnostics/support if that's wrong for this file.";
+    }
+
+    /// <summary>Guesses a qemu-img -f format from the file's extension. VirtualBox uses .vdi, VMware uses .vmdk, Hyper-V uses .vhd/.vhdx.</summary>
+    private static string GuessDiskFormat(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".qcow2" => "qcow2",
+            ".vdi" => "vdi",
+            ".vmdk" => "vmdk",
+            ".vhd" => "vpc",
+            ".vhdx" => "vhdx",
+            ".img" or ".raw" => "raw",
+            _ => "raw",
+        };
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {

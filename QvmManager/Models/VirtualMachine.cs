@@ -30,7 +30,9 @@ public class VirtualMachine
     // Hardware
     public int RamMb { get; set; } = 4096;
     public int Cpus { get; set; } = 2;
-    public string DiskSizeGb { get; set; } = "40";      // only used at creation time
+    public string DiskSizeGb { get; set; } = "40";      // only used when QVM Manager creates the disk itself
+    public string DiskFormat { get; set; } = "qcow2";   // qcow2 | vdi | vmdk | vhdx | raw - matches whatever DiskPath actually is
+    public bool ImportedDisk { get; set; } = false;     // true if DiskPath points at a disk the user already had, not one QVM Manager created
     public bool EnableAudio { get; set; } = true;
     public bool EnableAcceleration { get; set; } = true; // use WHPX if available
 
