@@ -1,0 +1,50 @@
+<Window x:Class="QvmManager.Views.DiagnosticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Diagnostics" Height="620" Width="760"
+        Background="{StaticResource BgDark}"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Diagnostics" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+            <TextBlock Text="Everything below can be pasted straight into a chat if something's wrong."
+                       FontSize="11" Foreground="{StaticResource TextSecondary}"
+                       VerticalAlignment="Center" Margin="14,4,0,0"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="Copy full report" Width="140" Margin="0,0,8,0" Click="CopyReport_Click"/>
+            <Button Content="Refresh" Width="100" Margin="0,0,8,0" Click="Refresh_Click"/>
+            <Button Content="Open log file" Width="120" Margin="0,0,8,0" Click="OpenLog_Click"/>
+            <Button Content="Open log folder" Width="130" Click="OpenLogFolder_Click"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0">
+            <TabItem Header="System">
+                <TextBox x:Name="SystemText" IsReadOnly="True" TextWrapping="NoWrap"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"/>
+            </TabItem>
+            <TabItem Header="VMs">
+                <TextBox x:Name="VmsText" IsReadOnly="True" TextWrapping="NoWrap"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"/>
+            </TabItem>
+            <TabItem Header="Log (last ~400 lines)">
+                <TextBox x:Name="LogText" IsReadOnly="True" TextWrapping="NoWrap"
+                         AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="11"/>
+            </TabItem>
+        </TabControl>
+
+        <TextBlock x:Name="CopiedLabel" Grid.Row="3" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}"
+                   Visibility="Collapsed" Text="Copied to clipboard."/>
+    </Grid>
+</Window>

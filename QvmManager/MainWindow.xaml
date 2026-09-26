@@ -1,0 +1,247 @@
+<Window x:Class="QvmManager.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QVM Manager" Height="620" Width="920"
+        Background="{StaticResource BgDark}"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left: VM list -->
+        <Border Grid.Column="0" Background="{StaticResource BgPanel}">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="14">
+                    <TextBlock Text="QVM Manager" FontSize="18" FontWeight="Bold" Margin="0,0,0,2"/>
+                    <TextBlock Text="QEMU-based, no account needed" FontSize="11"
+                               Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12"/>
+                    <Button Content="+ New VM" Margin="0,0,0,8" Click="NewVm_Click"/>
+                    <Button x:Name="StorageLocationButton" Content="Storage location..." Margin="0,0,0,8" Click="StorageLocation_Click"/>
+                    <Button x:Name="DiagnosticsButton" Content="Diagnostics..." Click="Diagnostics_Click"/>
+                </StackPanel>
+
+                <ListBox x:Name="VmListBox"
+                         Background="Transparent" BorderThickness="0"
+                         Margin="8,0,8,8"
+                         SelectionChanged="VmListBox_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="6,8">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                           Foreground="{StaticResource TextSecondary}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="Padding" Value="4"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgControl}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#2C2E3A"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <!-- Right: details / settings -->
+        <Grid Grid.Column="1" Margin="28" x:Name="DetailsGrid">
+            <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        Visibility="Visible">
+                <TextBlock Text="No VM selected" FontSize="16" HorizontalAlignment="Center"
+                           Foreground="{StaticResource TextSecondary}"/>
+                <TextBlock Text="Create one with + New VM, or pick one on the left." FontSize="12"
+                           HorizontalAlignment="Center" Margin="0,6,0,0"
+                           Foreground="{StaticResource TextSecondary}"/>
+            </StackPanel>
+
+            <ScrollViewer x:Name="DetailsScroll" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="DetailsPanel">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="VmTitle" FontSize="24" FontWeight="Bold"/>
+                        <TextBlock x:Name="VmSubtitle" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="StartButton" Content="▶  Start" Width="100" Margin="0,0,8,0" Click="Start_Click"/>
+                        <Button x:Name="StopButton" Content="■  Stop" Width="100" Click="Stop_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,18,0,18"/>
+
+                <TextBlock Text="Hardware" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Memory (MB)" VerticalAlignment="Center"/>
+                    <TextBox x:Name="RamBox" Grid.Column="1" Width="140" HorizontalAlignment="Left"
+                             LostFocus="Settings_Changed"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="CPU cores" VerticalAlignment="Center"/>
+                    <TextBox x:Name="CpuBox" Grid.Column="1" Width="140" HorizontalAlignment="Left"
+                             LostFocus="Settings_Changed"/>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Disk size (GB)" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" x:Name="DiskSizeText" VerticalAlignment="Center"
+                               Foreground="{StaticResource TextSecondary}"/>
+                </Grid>
+
+                <CheckBox x:Name="AccelCheck" Content="Use hardware acceleration (Windows Hypervisor Platform) when available"
+                          Margin="0,4,0,10" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
+                <CheckBox x:Name="AudioCheck" Content="Enable audio device"
+                          Margin="0,0,0,10" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
+                <CheckBox x:Name="TabletCheck" Content="Attach USB tablet device (smoother mouse capture)"
+                          Margin="0,0,0,18" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
+
+                <TextBlock Text="Chipset &amp; devices" FontWeight="Bold" Margin="0,0,0,10"/>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Machine type" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="MachineTypeBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                              SelectionChanged="Settings_Changed">
+                        <ComboBoxItem Content="q35 (modern PCIe chipset)" Tag="q35"/>
+                        <ComboBoxItem Content="pc (legacy i440fx chipset)" Tag="pc"/>
+                    </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Disk interface" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="DiskInterfaceBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                              SelectionChanged="Settings_Changed">
+                        <ComboBoxItem Content="virtio (fastest, needs guest drivers)" Tag="virtio"/>
+                        <ComboBoxItem Content="ide (most compatible, slower)" Tag="ide"/>
+                        <ComboBoxItem Content="sata (ahci)" Tag="sata"/>
+                        <ComboBoxItem Content="nvme" Tag="nvme"/>
+                    </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Display (-vga)" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="DisplayBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                              SelectionChanged="Settings_Changed">
+                        <ComboBoxItem Content="std (safe default)" Tag="std"/>
+                        <ComboBoxItem Content="virtio (needs guest drivers, resizable)" Tag="virtio"/>
+                        <ComboBoxItem Content="qxl (Spice-oriented)" Tag="qxl"/>
+                        <ComboBoxItem Content="vmware (vmware-svga)" Tag="vmware"/>
+                    </ComboBox>
+                </Grid>
+
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Resolution (-g)" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="ResolutionBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                              SelectionChanged="Settings_Changed">
+                        <ComboBoxItem Content="Default" Tag=""/>
+                        <ComboBoxItem Content="1280x720 (16:9)" Tag="1280x720"/>
+                        <ComboBoxItem Content="1366x768 (16:9)" Tag="1366x768"/>
+                        <ComboBoxItem Content="1600x900 (16:9)" Tag="1600x900"/>
+                        <ComboBoxItem Content="1920x1080 (16:9)" Tag="1920x1080"/>
+                        <ComboBoxItem Content="2560x1440 (16:9)" Tag="2560x1440"/>
+                        <ComboBoxItem Content="3840x2160 (16:9)" Tag="3840x2160"/>
+                        <ComboBoxItem Content="1024x768 (4:3)" Tag="1024x768"/>
+                    </ComboBox>
+                </Grid>
+                <TextBlock Text="Only applies with Display set to std or vmware." FontSize="11"
+                           Foreground="{StaticResource TextSecondary}" Margin="0,-4,0,10"/>
+
+                <Grid Margin="0,0,0,18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Network adapter" VerticalAlignment="Center"/>
+                    <ComboBox x:Name="NetworkModelBox" Grid.Column="1" Width="200" HorizontalAlignment="Left"
+                              SelectionChanged="Settings_Changed">
+                        <ComboBoxItem Content="virtio-net-pci (fastest)" Tag="virtio-net-pci"/>
+                        <ComboBoxItem Content="e1000 (Intel, broad support)" Tag="e1000"/>
+                        <ComboBoxItem Content="rtl8139 (oldest, most compatible)" Tag="rtl8139"/>
+                    </ComboBox>
+                </Grid>
+
+                <TextBlock Text="Extra QEMU arguments" FontWeight="Bold" Margin="0,0,0,4"/>
+                <TextBlock Text="Anything else QEMU supports, passed through as-is (e.g. -boot menu=on). Quote values with spaces."
+                           FontSize="11" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                <TextBox x:Name="ExtraArgsBox" Margin="0,0,0,18" AcceptsReturn="False"
+                         LostFocus="Settings_Changed"/>
+
+                <TextBlock Text="Installer ISO" FontWeight="Bold" Margin="0,0,0,10"/>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="IsoBox" IsReadOnly="True"/>
+                    <Button Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Click="BrowseIso_Click"/>
+                </Grid>
+                <CheckBox x:Name="BootIsoCheck" Content="Boot from ISO first (uncheck once the OS is installed)"
+                          Margin="0,4,0,0" Checked="Settings_Changed" Unchecked="Settings_Changed"/>
+
+                <Border Height="1" Background="{StaticResource BorderBrush}" Margin="0,20,0,16"/>
+
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Open VM folder" Width="140" Margin="0,0,8,0" Click="OpenFolder_Click"/>
+                    <Button Content="Delete VM" Width="140" Click="Delete_Click"/>
+                </StackPanel>
+
+                <TextBlock x:Name="StatusLine" Margin="0,16,0,0" FontSize="11"
+                           Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap"/>
+            </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

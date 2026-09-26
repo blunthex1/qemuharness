@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>QvmManager</AssemblyName>
+    <RootNamespace>QvmManager</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- See README.md for the "dotnet publish" command that builds a single standalone exe.
+         WPF ships some native (non-.NET) DLLs like wpfgfx_cor3.dll - PublishSingleFile doesn't
+         bundle those into the single exe by default, which crashes at startup with a
+         DllNotFoundException. This setting makes the exe extract them to a temp folder at
+         first run instead, so the single-file exe actually works for a WPF app. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+</Project>
