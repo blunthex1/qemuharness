@@ -105,8 +105,9 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <TextBlock Text="Memory (MB)" VerticalAlignment="Center"/>
-                    <TextBox x:Name="RamBox" Grid.Column="1" Width="140" HorizontalAlignment="Left"
-                             LostFocus="Settings_Changed"/>
+                    <ComboBox x:Name="RamBox" Grid.Column="1" Width="140" HorizontalAlignment="Left"
+                              IsEditable="True" IsTextSearchEnabled="False"
+                              SelectionChanged="RamBox_SelectionChanged" LostFocus="Settings_Changed"/>
                 </Grid>
 
                 <Grid Margin="0,0,0,10">

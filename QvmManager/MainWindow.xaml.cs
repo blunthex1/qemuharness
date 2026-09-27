@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -20,6 +21,9 @@ public partial class MainWindow : Window
 
     private VirtualMachine? _selected;
     private bool _suppressSettingsEvents;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetPhysicallyInstalledSystemMemory(out long totalMemoryInKilobytes);
 
     public MainWindow()
     {
@@ -50,6 +54,7 @@ public partial class MainWindow : Window
         _engine = new QemuEngine(appRoot);
         _engine.VmStopped += vm => Dispatcher.Invoke(() => RefreshList(vm.Id));
 
+        PopulateRamOptions();
         RefreshList();
         Loaded += async (_, _) =>
         {
@@ -343,7 +348,9 @@ public partial class MainWindow : Window
 
             VmTitle.Text = _selected.Name;
             VmSubtitle.Text = $"{_selected.OsType}  ·  {(running ? "Running" : "Stopped")}";
-            RamBox.Text = _selected.RamMb.ToString();
+            RamBox.SelectedItem = RamBox.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => (string)i.Tag == _selected.RamMb.ToString());
+            RamBox.Text = _selected.RamMb.ToString(); // reassert raw MB even if no dropdown entry matches
             CpuBox.Text = _selected.Cpus.ToString();
             CpuModelBox.Text = _selected.CpuModel ?? "";
             CpuFlagsBox.Text = _selected.CpuFlags ?? "";
@@ -372,6 +379,57 @@ public partial class MainWindow : Window
         {
             _suppressSettingsEvents = false;
         }
+    }
+
+    /// <summary>
+    /// Fills the Memory dropdown with one entry per GB of RAM actually installed in this
+    /// machine (1 GB, 2 GB, ... up to the physical total), so picking a size is a click
+    /// instead of typing MB by hand. The box stays editable, so a raw MB number can still
+    /// be typed in directly, same as before.
+    /// </summary>
+    private void PopulateRamOptions()
+    {
+        RamBox.Items.Clear();
+
+        long totalMb = 0;
+        try
+        {
+            if (GetPhysicallyInstalledSystemMemory(out var totalKb) && totalKb > 0)
+                totalMb = totalKb / 1024;
+        }
+        catch
+        {
+            // GetPhysicallyInstalledSystemMemory can fail on some systems/VMs - fall back below.
+        }
+
+        if (totalMb <= 0)
+        {
+            // Detection failed - offer a generic ladder rather than an empty dropdown.
+            foreach (var gb in new[] { 1, 2, 4, 8, 16, 32 })
+                RamBox.Items.Add(new ComboBoxItem { Content = $"{gb} GB", Tag = (gb * 1024).ToString() });
+            return;
+        }
+
+        var totalGb = Math.Max(1, (int)(totalMb / 1024));
+        for (var gb = 1; gb <= totalGb; gb++)
+            RamBox.Items.Add(new ComboBoxItem { Content = $"{gb} GB", Tag = (gb * 1024).ToString() });
+
+        // If the installed total isn't an exact multiple of 1024 MB (e.g. 3.5 GB reported by
+        // firmware/shared-memory setups), add the exact figure too so all of it is selectable.
+        if (totalMb % 1024 != 0)
+            RamBox.Items.Add(new ComboBoxItem { Content = $"{totalMb} MB (all installed RAM)", Tag = totalMb.ToString() });
+    }
+
+    /// <summary>Picking a dropdown entry applies its MB value immediately, same as the CPU presets above.</summary>
+    private void RamBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSettingsEvents || _selected == null) return;
+        if (RamBox.SelectedItem is ComboBoxItem item && item.Tag is string tag &&
+            int.TryParse(tag, out var mb) && mb > 0)
+        {
+            _selected.RamMb = mb;
+        }
+        Settings_Changed(sender, e);
     }
 
     private void Settings_Changed(object sender, RoutedEventArgs e)
