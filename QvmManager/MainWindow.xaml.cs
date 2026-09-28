@@ -348,13 +348,7 @@ public partial class MainWindow : Window
 
             VmTitle.Text = _selected.Name;
             VmSubtitle.Text = $"{_selected.OsType}  ·  {(running ? "Running" : "Stopped")}";
-            var ramMatch = RamBox.Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => (string)i.Tag == _selected.RamMb.ToString());
-            RamBox.SelectedItem = ramMatch;
-            // Show the friendly "N GB" label when it matches a dropdown entry, otherwise the
-            // raw MB number (same as manual typing produces). SelectedItem alone doesn't update
-            // Text reliably for ComboBoxItem entries, so set it explicitly either way.
-            RamBox.Text = ramMatch != null ? ramMatch.Content.ToString() : _selected.RamMb.ToString();
+            SelectRamItemFor(_selected.RamMb);
             CpuBox.Text = _selected.Cpus.ToString();
             CpuModelBox.Text = _selected.CpuModel ?? "";
             CpuFlagsBox.Text = _selected.CpuFlags ?? "";
@@ -385,11 +379,14 @@ public partial class MainWindow : Window
         }
     }
 
+    private const string CustomRamTag = "custom";
+
     /// <summary>
     /// Fills the Memory dropdown with one entry per GB of RAM actually installed in this
     /// machine (1 GB, 2 GB, ... up to the physical total), so picking a size is a click
-    /// instead of typing MB by hand. The box stays editable, so a raw MB number can still
-    /// be typed in directly, same as before.
+    /// instead of typing MB by hand, plus a trailing "Custom..." entry that opens a small
+    /// prompt for typing an exact MB value (the app's ComboBox theme doesn't support an
+    /// inline-editable box, so this is the equivalent of the old free-typed textbox).
     /// </summary>
     private void PopulateRamOptions()
     {
@@ -411,32 +408,98 @@ public partial class MainWindow : Window
             // Detection failed - offer a generic ladder rather than an empty dropdown.
             foreach (var gb in new[] { 1, 2, 4, 8, 16, 32 })
                 RamBox.Items.Add(new ComboBoxItem { Content = $"{gb} GB", Tag = (gb * 1024).ToString() });
-            return;
+        }
+        else
+        {
+            var totalGb = Math.Max(1, (int)(totalMb / 1024));
+            for (var gb = 1; gb <= totalGb; gb++)
+                RamBox.Items.Add(new ComboBoxItem { Content = $"{gb} GB", Tag = (gb * 1024).ToString() });
+
+            // If the installed total isn't an exact multiple of 1024 MB (e.g. 3.5 GB reported by
+            // firmware/shared-memory setups), add the exact figure too so all of it is selectable.
+            if (totalMb % 1024 != 0)
+                RamBox.Items.Add(new ComboBoxItem { Content = $"{totalMb} MB (all installed RAM)", Tag = totalMb.ToString() });
         }
 
-        var totalGb = Math.Max(1, (int)(totalMb / 1024));
-        for (var gb = 1; gb <= totalGb; gb++)
-            RamBox.Items.Add(new ComboBoxItem { Content = $"{gb} GB", Tag = (gb * 1024).ToString() });
+        RamBox.Items.Add(new ComboBoxItem { Content = "Custom (type MB)...", Tag = CustomRamTag });
+    }
 
-        // If the installed total isn't an exact multiple of 1024 MB (e.g. 3.5 GB reported by
-        // firmware/shared-memory setups), add the exact figure too so all of it is selectable.
-        if (totalMb % 1024 != 0)
-            RamBox.Items.Add(new ComboBoxItem { Content = $"{totalMb} MB (all installed RAM)", Tag = totalMb.ToString() });
+    /// <summary>
+    /// Selects whichever dropdown entry matches this MB value, adding a "custom" entry for it
+    /// (just above the "Custom..." prompt) if none of the GB presets match.
+    /// </summary>
+    private void SelectRamItemFor(int mb)
+    {
+        var match = RamBox.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(i => (string)i.Tag == mb.ToString());
+        if (match == null)
+        {
+            match = new ComboBoxItem { Content = $"{mb} MB (custom)", Tag = mb.ToString() };
+            var customPromptIndex = RamBox.Items.Count - 1; // "Custom..." is always last
+            RamBox.Items.Insert(Math.Max(0, customPromptIndex), match);
+        }
+        RamBox.SelectedItem = match;
+    }
+
+    /// <summary>A minimal "type a number" dialog, since this app's dark ComboBox theme has no editable-text part to reuse.</summary>
+    private static int? PromptForCustomRamMb(Window owner, int currentMb)
+    {
+        var dialog = new Window
+        {
+            Title = "Custom RAM",
+            Width = 300,
+            SizeToContent = SizeToContent.Height,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = owner
+        };
+
+        var panel = new StackPanel { Margin = new Thickness(16) };
+        panel.Children.Add(new TextBlock { Text = "Memory in MB:", Margin = new Thickness(0, 0, 0, 8) });
+        var box = new TextBox { Text = currentMb.ToString(), Margin = new Thickness(0, 0, 0, 16) };
+        panel.Children.Add(box);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        var ok = new Button { Content = "OK", Width = 80, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+        var cancel = new Button { Content = "Cancel", Width = 80, IsCancel = true };
+        buttons.Children.Add(ok);
+        buttons.Children.Add(cancel);
+        panel.Children.Add(buttons);
+        dialog.Content = panel;
+
+        int? result = null;
+        ok.Click += (_, _) =>
+        {
+            if (int.TryParse(box.Text, out var mb) && mb > 0) { result = mb; dialog.DialogResult = true; }
+            else MessageBox.Show(dialog, "Enter a whole number of MB greater than 0.", "QVM Manager", MessageBoxButton.OK, MessageBoxImage.Warning);
+        };
+
+        box.Loaded += (_, _) => { box.Focus(); box.SelectAll(); };
+        dialog.ShowDialog();
+        return result;
     }
 
     /// <summary>Picking a dropdown entry applies its MB value immediately, same as the CPU presets above.</summary>
     private void RamBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_suppressSettingsEvents || _selected == null) return;
-        if (RamBox.SelectedItem is ComboBoxItem item && item.Tag is string tag &&
-            int.TryParse(tag, out var mb) && mb > 0)
+        if (RamBox.SelectedItem is not ComboBoxItem item || item.Tag is not string tag) return;
+
+        if (tag == CustomRamTag)
         {
-            _selected.RamMb = mb;
-            // WPF's editable ComboBox sets Text from the selected item's ToString() by default,
-            // which for a ComboBoxItem is just its type name, not its Content ("4 GB"). Set it
-            // ourselves so the box actually shows what was picked.
-            RamBox.Text = item.Content.ToString();
+            var mb = PromptForCustomRamMb(this, _selected.RamMb);
+            _suppressSettingsEvents = true;
+            try { SelectRamItemFor(mb ?? _selected.RamMb); } // re-select the old value if cancelled
+            finally { _suppressSettingsEvents = false; }
+            if (!mb.HasValue) return;
+
+            _selected.RamMb = mb.Value;
+            Settings_Changed(sender, e);
+            return;
         }
+
+        if (int.TryParse(tag, out var presetMb) && presetMb > 0)
+            _selected.RamMb = presetMb;
         Settings_Changed(sender, e);
     }
 
@@ -444,7 +507,6 @@ public partial class MainWindow : Window
     {
         if (_suppressSettingsEvents || _selected == null) return;
 
-        if (int.TryParse(RamBox.Text, out var ram) && ram > 0) _selected.RamMb = ram;
         if (int.TryParse(CpuBox.Text, out var cpus) && cpus > 0) _selected.Cpus = cpus;
         _selected.CpuModel = CpuModelBox.Text.Trim();
         _selected.CpuFlags = CpuFlagsBox.Text.Trim();
