@@ -348,9 +348,13 @@ public partial class MainWindow : Window
 
             VmTitle.Text = _selected.Name;
             VmSubtitle.Text = $"{_selected.OsType}  ·  {(running ? "Running" : "Stopped")}";
-            RamBox.SelectedItem = RamBox.Items.OfType<ComboBoxItem>()
+            var ramMatch = RamBox.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(i => (string)i.Tag == _selected.RamMb.ToString());
-            RamBox.Text = _selected.RamMb.ToString(); // reassert raw MB even if no dropdown entry matches
+            RamBox.SelectedItem = ramMatch;
+            // Show the friendly "N GB" label when it matches a dropdown entry, otherwise the
+            // raw MB number (same as manual typing produces). SelectedItem alone doesn't update
+            // Text reliably for ComboBoxItem entries, so set it explicitly either way.
+            RamBox.Text = ramMatch != null ? ramMatch.Content.ToString() : _selected.RamMb.ToString();
             CpuBox.Text = _selected.Cpus.ToString();
             CpuModelBox.Text = _selected.CpuModel ?? "";
             CpuFlagsBox.Text = _selected.CpuFlags ?? "";
@@ -428,6 +432,11 @@ public partial class MainWindow : Window
             int.TryParse(tag, out var mb) && mb > 0)
         {
             _selected.RamMb = mb;
+            // WPF's editable ComboBox sets Text from the selected item's ToString() by default,
+            // which for a ComboBoxItem is just its type name, not its Content ("4 GB"). Set it
+            // ourselves so the box actually shows what was picked.
+            RamBox.Text = item.Content.ToString();
+            RamBox.CaretIndex = RamBox.Text.Length;
         }
         Settings_Changed(sender, e);
     }
