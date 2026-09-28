@@ -436,7 +436,6 @@ public partial class MainWindow : Window
             // which for a ComboBoxItem is just its type name, not its Content ("4 GB"). Set it
             // ourselves so the box actually shows what was picked.
             RamBox.Text = item.Content.ToString();
-            RamBox.CaretIndex = RamBox.Text.Length;
         }
         Settings_Changed(sender, e);
     }
